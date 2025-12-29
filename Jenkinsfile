@@ -42,6 +42,17 @@ pipeline {
                     }
                 }
             }
+		
+		stage('Cobertura') {
+                steps {
+                    bat '''
+                        set PYTHONPATH=%WORKSPACE%
+                        coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest test\\unit
+                        coverage xml
+                     '''
+                     recordCoverage qualityGates: [[criticality: 'NOTE', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'LINE', threshold: 60.0], [criticality: 'NOTE', integerThreshold: 85, metric: 'BRANCH', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'BRANCH', threshold: 60.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
+                }
+            }
 
         stage('Results') {
             steps {
