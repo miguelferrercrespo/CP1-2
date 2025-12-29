@@ -9,11 +9,12 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Static') {
             steps {
-                echo 'Eyyy, esto es Python. No hay que compilar nada!!!'
-                echo "WORKSPACE: ${env.WORKSPACE}"
-                bat 'dir'
+                bat '''
+                    flake8 --exit-zero --format=pylint app >flake8.out
+                '''
+                recordIssues qualityGates: [[criticality: 'NOTE', integerThreshold: 14, threshold: 14.0, type: 'TOTAL'], [criticality: 'FAILURE', integerThreshold: 15, threshold: 15.0, type: 'TOTAL']], sourceCodeRetention: 'LAST_BUILD', tools: [flake8(pattern: 'flake8.out')]
             }
         }
 
@@ -42,7 +43,11 @@ pipeline {
                     }
                 }
             }
-		
+		stage('Results') {
+            steps {
+                junit 'result*.xml'
+            }
+        }
 		stage('Cobertura') {
                 steps {
                     bat '''
@@ -53,11 +58,26 @@ pipeline {
                      recordCoverage qualityGates: [[criticality: 'NOTE', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'LINE', threshold: 60.0], [criticality: 'NOTE', integerThreshold: 85, metric: 'BRANCH', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'BRANCH', threshold: 60.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
                 }
             }
-
-        stage('Results') {
-            steps {
-                junit 'result*.xml'
+			
+		stage('Security') {
+             steps {
+                  bat '''
+                      bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
+                      '''
+                      recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 1, type: 'TOTAL', unstable: true], [threshold: 2, type: 'TOTAL', unstable: false]]
+                 }
             }
-        }
+            stage('Performance') {
+                steps {
+                     bat '''
+                        set FLASK_APP=app\\api.py
+                        set FLASK_ENV=development
+                        start flask run
+                        ping -n 5 127.0.0.1
+                         C:\\Users\\migue\\Unir_Devops\\cp1.1\\utils\\apache-jmeter-5.6.3\\bin\\jmeter -n -t test\\jmeter\\flask.jmx -f -l flask.jtl
+                        '''
+                        perfReport sourceDataFiles: 'flask.jtl'
+                 }
+            }
     }
 }
