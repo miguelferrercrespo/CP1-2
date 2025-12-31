@@ -86,35 +86,39 @@ pipeline {
             }
         }
 
-        stage('Security') {
-            agent { label 'agent2' }
-            steps {
-                unstash 'code'
-                bat '''
-                    whoami
-                    hostname
-                    echo WORKSPACE: %WORKSPACE%
-                    bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
-                '''
-                recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true], [threshold: 4, type: 'TOTAL', unstable: false]]
-            }
-        }
+        stage('Security & Performance') {
+            parallel {
+                stage('Security') {
+                    agent { label 'agent2' }
+                    steps {
+                        unstash 'code'
+                        bat '''
+                            whoami
+                            hostname
+                            echo WORKSPACE: %WORKSPACE%
+                            bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
+                        '''
+                        recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true], [threshold: 4, type: 'TOTAL', unstable: false]]
+                    }
+                }
 
-        stage('Performance') {
-            agent { label 'agent3' }
-            steps {
-                unstash 'code'
-                bat '''
-                    whoami
-                    hostname
-                    echo WORKSPACE: %WORKSPACE%
-                    set FLASK_APP=app\\api.py
-                    set FLASK_ENV=development
-                    start flask run
-                    ping -n 5 127.0.0.1
-                    C:\\Users\\migue\\Unir_Devops\\cp1.1\\utils\\apache-jmeter-5.6.3\\bin\\jmeter -n -t test\\jmeter\\flask.jmx -f -l flask.jtl
-                '''
-                perfReport sourceDataFiles: 'flask.jtl'
+                stage('Performance') {
+                    agent { label 'agent3' }
+                    steps {
+                        unstash 'code'
+                        bat '''
+                            whoami
+                            hostname
+                            echo WORKSPACE: %WORKSPACE%
+                            set FLASK_APP=app\\api.py
+                            set FLASK_ENV=development
+                            start flask run
+                            ping -n 5 127.0.0.1
+                            C:\\Users\\migue\\Unir_Devops\\cp1.1\\utils\\apache-jmeter-5.6.3\\bin\\jmeter -n -t test\\jmeter\\flask.jmx -f -l flask.jtl
+                        '''
+                        perfReport sourceDataFiles: 'flask.jtl'
+                    }
+                }
             }
         }
     }
