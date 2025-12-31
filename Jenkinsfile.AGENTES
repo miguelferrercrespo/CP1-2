@@ -9,6 +9,11 @@ pipeline {
                 // Obtener código del repo
                 git 'https://github.com/miguelferrercrespo/helloworld.git'
                 echo "WORKSPACE: ${env.WORKSPACE}"
+                bat '''
+                    whoami
+                    hostname
+                    echo WORKSPACE: %WORKSPACE%
+                '''
                 bat 'dir'
                 stash name: 'code', includes: '**/*'
             }
@@ -18,6 +23,11 @@ pipeline {
             agent { label 'agent2' }
             steps {
                 unstash 'code'
+                bat '''
+                    whoami
+                    hostname
+                    echo WORKSPACE: %WORKSPACE%
+                '''
                 bat '''
                     flake8 --exit-zero --format=pylint app >flake8.out
                 '''
@@ -31,6 +41,11 @@ pipeline {
                     steps {
                         unstash 'code'
                         bat '''
+                            whoami
+                            hostname
+                            echo WORKSPACE: %WORKSPACE%
+                        '''
+                        bat '''
                             set PYTHONPATH=%WORKSPACE%
                              pytest --junitxml=result-unit.xml test\\unit
                             '''
@@ -42,6 +57,11 @@ pipeline {
                     agent { label 'agent3' }
                     steps {
                         unstash 'code'
+                        bat '''
+                            whoami
+                            hostname
+                            echo WORKSPACE: %WORKSPACE%
+                        '''
                         bat '''
                                 set FLASK_APP=app\\api.py
                                 set FLASK_ENV=development
@@ -58,6 +78,11 @@ pipeline {
 
         stage('Results') {
             steps {
+                bat '''
+                    whoami
+                    hostname
+                    echo WORKSPACE: %WORKSPACE%
+                '''
                 unstash 'unit-res'
                 unstash 'rest-res'
                 junit 'result*.xml'
@@ -67,6 +92,11 @@ pipeline {
         stage('Cobertura') {
             steps {
                 unstash 'code'
+                bat '''
+                    whoami
+                    hostname
+                    echo WORKSPACE: %WORKSPACE%
+                '''
                 bat '''
                         set PYTHONPATH=%WORKSPACE%
                         coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest test\\unit
@@ -81,6 +111,11 @@ pipeline {
             steps {
                 unstash 'code'
                 bat '''
+                    whoami
+                    hostname
+                    echo WORKSPACE: %WORKSPACE%
+                '''
+                bat '''
                       bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
                       '''
                 recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 4, type: 'TOTAL', unstable: true], [threshold: 8, type: 'TOTAL', unstable: false]]
@@ -91,6 +126,11 @@ pipeline {
             agent { label 'agent3' }
             steps {
                 unstash 'code'
+                bat '''
+                    whoami
+                    hostname
+                    echo WORKSPACE: %WORKSPACE%
+                '''
                 bat '''
                         set FLASK_APP=app\\api.py
                         set FLASK_ENV=development
@@ -103,4 +143,3 @@ pipeline {
         }
     }
 }
-
