@@ -6,7 +6,6 @@ pipeline {
     stages {
         stage('Get Code') {
             steps {
-                // Obtener código del repo
                 git 'https://github.com/miguelferrercrespo/helloworld.git'
                 echo "WORKSPACE: ${env.WORKSPACE}"
                 bat '''
