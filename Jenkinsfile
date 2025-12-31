@@ -1,12 +1,11 @@
 pipeline {
     agent any
 
-	 options { skipDefaultCheckout() }
+    options { skipDefaultCheckout() }
 
     stages {
         stage('Get Code') {
             steps {
-                // Obtener código del repo
                 git 'https://github.com/miguelferrercrespo/helloworld.git'
             }
         }
@@ -16,13 +15,13 @@ pipeline {
                 bat '''
                     flake8 --exit-zero --format=pylint app >flake8.out
                 '''
-				catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                recordIssues enabledForFailure: true, qualityGates: [[criticality: 'NOTE', integerThreshold: 8, threshold: 8.0, type: 'TOTAL'], [criticality: 'ERROR', integerThreshold: 10, threshold: 10.0, type: 'TOTAL']], sourceCodeRetention: 'LAST_BUILD', tools: [flake8(pattern: 'flake8.out')]
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    recordIssues enabledForFailure: true, qualityGates: [[criticality: 'NOTE', integerThreshold: 8, threshold: 8.0, type: 'TOTAL'], [criticality: 'ERROR', integerThreshold: 10, threshold: 10.0, type: 'TOTAL']], sourceCodeRetention: 'LAST_BUILD', tools: [flake8(pattern: 'flake8.out')]
+                }
             }
-		  }
         }
 
-       stage('Tests') {
+        stage('Tests') {
             parallel {
                 stage('Unit') {
                     steps {
@@ -31,48 +30,52 @@ pipeline {
                             coverage run --fail-under=0 --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest --junitxml=result-unit.xml test\\unit
                             coverage xml
                         '''
-                         }
-                    }
-
-                     stage('Service') {
-                        steps {
-                            bat '''
-                                set FLASK_APP=app\\api.py
-                                set FLASK_ENV=development
-                                start flask run
-                                start java -jar C:\\Users\\migue\\Unir_Devops\\wiremock\\wiremock-jre8-standalone-2.28.0.jar --port 9090 --root-dir test\\wiremock
-                                set PYTHONPATH=%WORKSPACE%
-                                pytest --junitxml=result-rest.xml test\\rest
-                            '''
-                        }
+                        junit 'result-unit.xml'
                     }
                 }
-            }
-        	stage('Cobertura') {
-                steps {
-					 recordCoverage qualityGates: [[criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
-                }
-            }
 
-		stage('Security') {
-             steps {
-                  bat '''
-                      bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
-                      '''
-                      recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true], [threshold: 4, type: 'TOTAL', unstable: false]]
-                 }
-            }
-            stage('Performance') {
-                steps {
-                     bat '''
-                        set FLASK_APP=app\\api.py
-                        set FLASK_ENV=development
-                        start flask run
-                        ping -n 5 127.0.0.1
-                         C:\\Users\\migue\\Unir_Devops\\cp1.1\\utils\\apache-jmeter-5.6.3\\bin\\jmeter -n -t test\\jmeter\\flask.jmx -f -l flask.jtl
+                stage('Service') {
+                    steps {
+                        bat '''
+                            set FLASK_APP=app\\api.py
+                            set FLASK_ENV=development
+                            start flask run
+                            start java -jar C:\\Users\\migue\\Unir_Devops\\wiremock\\wiremock-jre8-standalone-2.28.0.jar --port 9090 --root-dir test\\wiremock
+                            set PYTHONPATH=%WORKSPACE%
+                            pytest --junitxml=result-rest.xml test\\rest
                         '''
-                        perfReport sourceDataFiles: 'flask.jtl'
-                 }
+                        junit 'result-rest.xml'
+                    }
+                }
             }
+        }
+
+        stage('Cobertura') {
+            steps {
+                recordCoverage qualityGates: [[criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
+            }
+        }
+
+        stage('Security') {
+            steps {
+                bat '''
+                    bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
+                '''
+                recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true], [threshold: 4, type: 'TOTAL', unstable: false]]
+            }
+        }
+
+        stage('Performance') {
+            steps {
+                bat '''
+                    set FLASK_APP=app\\api.py
+                    set FLASK_ENV=development
+                    start flask run
+                    ping -n 5 127.0.0.1
+                    C:\\Users\\migue\\Unir_Devops\\cp1.1\\utils\\apache-jmeter-5.6.3\\bin\\jmeter -n -t test\\jmeter\\flask.jmx -f -l flask.jtl
+                '''
+                perfReport sourceDataFiles: 'flask.jtl'
+            }
+        }
     }
 }
