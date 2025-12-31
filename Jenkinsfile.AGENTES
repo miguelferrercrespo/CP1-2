@@ -6,14 +6,15 @@ pipeline {
     stages {
         stage('Get Code') {
             steps {
+                // Obtener código del repo
                 git 'https://github.com/miguelferrercrespo/helloworld.git'
                 echo "WORKSPACE: ${env.WORKSPACE}"
                 bat '''
                     whoami
                     hostname
                     echo WORKSPACE: %WORKSPACE%
+                    dir
                 '''
-                bat 'dir'
                 stash name: 'code', includes: '**/*'
             }
         }
@@ -26,8 +27,6 @@ pipeline {
                     whoami
                     hostname
                     echo WORKSPACE: %WORKSPACE%
-                '''
-                bat '''
                     flake8 --exit-zero --format=pylint app >flake8.out
                 '''
                 recordIssues qualityGates: [[criticality: 'NOTE', integerThreshold: 14, threshold: 14.0, type: 'TOTAL'], [criticality: 'FAILURE', integerThreshold: 15, threshold: 15.0, type: 'TOTAL']], sourceCodeRetention: 'LAST_BUILD', tools: [flake8(pattern: 'flake8.out')]
@@ -43,11 +42,9 @@ pipeline {
                             whoami
                             hostname
                             echo WORKSPACE: %WORKSPACE%
-                        '''
-                        bat '''
                             set PYTHONPATH=%WORKSPACE%
-                             pytest --junitxml=result-unit.xml test\\unit
-                            '''
+                            pytest --junitxml=result-unit.xml test\\unit
+                        '''
                         stash name: 'unit-res', includes: 'result-unit.xml'
                     }
                 }
@@ -57,11 +54,9 @@ pipeline {
                     steps {
                         unstash 'code'
                         bat '''
-                            whoami
-                            hostname
-                            echo WORKSPACE: %WORKSPACE%
-                        '''
-                        bat '''
+                                whoami
+                                hostname
+                                echo WORKSPACE: %WORKSPACE%
                                 set FLASK_APP=app\\api.py
                                 set FLASK_ENV=development
                                 start flask run
@@ -95,12 +90,10 @@ pipeline {
                     whoami
                     hostname
                     echo WORKSPACE: %WORKSPACE%
+                    set PYTHONPATH=%WORKSPACE%
+                    coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest test\\unit
+                    coverage xml
                 '''
-                bat '''
-                        set PYTHONPATH=%WORKSPACE%
-                        coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest test\\unit
-                        coverage xml
-                     '''
                 recordCoverage qualityGates: [[criticality: 'NOTE', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'LINE', threshold: 60.0], [criticality: 'NOTE', integerThreshold: 85, metric: 'BRANCH', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'BRANCH', threshold: 60.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
             }
         }
@@ -110,11 +103,9 @@ pipeline {
             steps {
                 unstash 'code'
                 bat '''
-                    whoami
-                    hostname
-                    echo WORKSPACE: %WORKSPACE%
-                '''
-                bat '''
+                      whoami
+                      hostname
+                      echo WORKSPACE: %WORKSPACE%
                       bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
                       '''
                 recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 4, type: 'TOTAL', unstable: true], [threshold: 8, type: 'TOTAL', unstable: false]]
@@ -126,11 +117,9 @@ pipeline {
             steps {
                 unstash 'code'
                 bat '''
-                    whoami
-                    hostname
-                    echo WORKSPACE: %WORKSPACE%
-                '''
-                bat '''
+                        whoami
+                        hostname
+                        echo WORKSPACE: %WORKSPACE%
                         set FLASK_APP=app\\api.py
                         set FLASK_ENV=development
                         start flask run
