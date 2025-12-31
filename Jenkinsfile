@@ -1,6 +1,8 @@
 pipeline {
     agent any
 
+	 options { skipDefaultCheckout() }
+
     stages {
         stage('Get Code') {
             steps {
@@ -14,8 +16,10 @@ pipeline {
                 bat '''
                     flake8 --exit-zero --format=pylint app >flake8.out
                 '''
-                recordIssues qualityGates: [[criticality: 'NOTE', integerThreshold: 14, threshold: 14.0, type: 'TOTAL'], [criticality: 'FAILURE', integerThreshold: 15, threshold: 15.0, type: 'TOTAL']], sourceCodeRetention: 'LAST_BUILD', tools: [flake8(pattern: 'flake8.out')]
+				catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                recordIssues enabledForFailure: true, qualityGates: [[criticality: 'NOTE', integerThreshold: 8, threshold: 8.0, type: 'TOTAL'], [criticality: 'ERROR', integerThreshold: 10, threshold: 10.0, type: 'TOTAL']], sourceCodeRetention: 'LAST_BUILD', tools: [flake8(pattern: 'flake8.out')]
             }
+		  }
         }
 
        stage('Tests') {
@@ -24,8 +28,9 @@ pipeline {
                     steps {
                         bat '''
                             set PYTHONPATH=%WORKSPACE%
-                             pytest --junitxml=result-unit.xml test\\unit
-                            '''
+                            coverage run --fail-under=0 --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest --junitxml=result-unit.xml test\\unit
+                            coverage xml
+                        '''
                          }
                     }
 
@@ -43,28 +48,23 @@ pipeline {
                     }
                 }
             }
-		stage('Results') {
+        stage('Results') {
             steps {
                 junit 'result*.xml'
             }
         }
-		stage('Cobertura') {
+        stage('Cobertura') {
                 steps {
-                    bat '''
-                        set PYTHONPATH=%WORKSPACE%
-                        coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest test\\unit
-                        coverage xml
-                     '''
-                     recordCoverage qualityGates: [[criticality: 'NOTE', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'LINE', threshold: 60.0], [criticality: 'NOTE', integerThreshold: 85, metric: 'BRANCH', threshold: 85.0], [criticality: 'ERROR', integerThreshold: 60, metric: 'BRANCH', threshold: 60.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
+					 recordCoverage qualityGates: [[criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
                 }
             }
-			
+
 		stage('Security') {
              steps {
                   bat '''
                       bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"
                       '''
-                      recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 4, type: 'TOTAL', unstable: true], [threshold: 8, type: 'TOTAL', unstable: false]]
+                      recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true], [threshold: 4, type: 'TOTAL', unstable: false]]
                  }
             }
             stage('Performance') {
