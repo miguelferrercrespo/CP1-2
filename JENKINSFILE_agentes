@@ -1,40 +1,4 @@
-pipeline {
-    agent any
-
-    options { skipDefaultCheckout() }
-
-    stages {
-        stage('Get Code') {
-            steps {
-                git 'https://github.com/miguelferrercrespo/helloworld.git'
-                echo "WORKSPACE: ${env.WORKSPACE}"
-                bat '''
-                    whoami
-                    hostname
-                    echo WORKSPACE: %WORKSPACE%
-                    dir
-                '''
-                stash name: 'code', includes: '**/*'
-            }
-        }
-
-        stage('Static') {
-            agent { label 'agent2' }
-            steps {
-                unstash 'code'
-                bat '''
-                    whoami
-                    hostname
-                    echo WORKSPACE: %WORKSPACE%
-                    flake8 --exit-zero --format=pylint app >flake8.out
-                '''
-                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                    recordIssues enabledForFailure: true, qualityGates: [[criticality: 'NOTE', integerThreshold: 8, threshold: 8.0, type: 'TOTAL'], [criticality: 'ERROR', integerThreshold: 10, threshold: 10.0, type: 'TOTAL']], sourceCodeRetention: 'LAST_BUILD', tools: [flake8(pattern: 'flake8.out')]
-                }
-            }
-        }
-
-        stage('Tests') {
+ stage('Tests') {
             parallel {
                 stage('Unit') {
                     steps {
@@ -47,7 +11,7 @@ pipeline {
                             coverage run --fail-under=0 --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest --junitxml=result-unit.xml test\\unit
                             coverage xml
                         '''
-                        stash name: 'unit-res', includes: 'result-unit.xml'
+                        junit 'result-unit.xml'
                         stash name: 'coverage', includes: 'coverage.xml'
                     }
                 }
@@ -67,22 +31,9 @@ pipeline {
                             set PYTHONPATH=%WORKSPACE%
                             pytest --junitxml=result-rest.xml test\\rest
                         '''
-                        stash name: 'rest-res', includes: 'result-rest.xml'
+                        junit 'result-rest.xml'
                     }
                 }
-            }
-        }
-
-        stage('Results') {
-            steps {
-                bat '''
-                    whoami
-                    hostname
-                    echo WORKSPACE: %WORKSPACE%
-                '''
-                unstash 'unit-res'
-                unstash 'rest-res'
-                junit 'result*.xml'
             }
         }
 
