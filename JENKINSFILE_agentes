@@ -6,7 +6,7 @@ pipeline {
     stages {
         stage('Get Code') {
             steps {
-                git 'https://github.com/miguelferrercrespo/helloworld.git'
+                checkout scm
                 echo "WORKSPACE: ${env.WORKSPACE}"
                 bat '''
                     whoami
