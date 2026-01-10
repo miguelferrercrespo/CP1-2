@@ -44,7 +44,9 @@ pipeline {
                             hostname
                             echo WORKSPACE: %WORKSPACE%
                             set PYTHONPATH=%WORKSPACE%
-                            coverage run --fail-under=0 --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest --junitxml=result-unit.xml test\\unit
+                            coverage erase
+                            coverage run --branch --source=app --omit=app\\__init__.py,app\\api.py -m pytest --junitxml=result-unit.xml test\\unit
+                            coverage report --fail-under=0 -m
                             coverage xml
                         '''
                         junit 'result-unit.xml'
